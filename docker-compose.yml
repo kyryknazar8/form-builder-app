@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: form_builder_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: qwerty
+      POSTGRES_DB: formbuilderdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d formbuilderdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: form_builder_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
+  web:
+    build: .
+    container_name: form_builder_web
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:qwerty@db:5432/formbuilderdb?schema=public
+      JWT_SECRET: 9a3fbb17a42de5e8d4f61b8c72e4c91acb1f6e7d8d9f2a31c7b4e6a5c8d9e3f1b2a4c6d8e0f9a7b5c3d1f2a4e6b8c9d7f5a3b1c2d4e6f7a9b8c7d6e5
+      PORT: 3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+      - "5555:5555"
+    command: sh -c "npm install && npx prisma generate && npm run dev"
+
+volumes:
+  pgdata:
+  ollama_data:
